@@ -4,7 +4,7 @@ A repository for reusable code related to AX 2012 deployment and maintenance.
 
 ## Get-AxDllVersions Cmdlet
 
-Lists the versions for all DLLs which will load in AX.  Run this script against all clients (RDP/Citrix/end-user) and servers.  This is useful to confirm that all DLLs deployed match in file version.
+Lists the versions for all the DLLs which will load in AX.  It checks nine locations on every computer provided to the command.  Run this script against all clients (RDP/Citrix/end-user) and servers.  This can be used to confirm that all DLLs deployed match in file version.
 
 ### Example 1: Export DLL Versions for Local Machine
 
