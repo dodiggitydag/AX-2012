@@ -5,11 +5,12 @@
  *
  * Before Running-
  *   Stop the AOS
- *   Always take a backup before running this
- *   Change database Name to your own DB names when testing the following script and DB collation (Ctrl + H)
+ *   Always take the appropriate SQL backups before running this script
+ *   Change database name <<AX2012DB>> to your own DB names (Ctrl + H)
  *
  * After Running-
  *   Add a reminder in your calendar to delete the table backups made: SQLDICTIONARY_BAK and SYSTEMSEQUENCES_BAK
+ *   Start the AOS and try a dbsync within AX
  *
  * Notes
  *   To review what it will do, run the CTE separately before running the whole command.
@@ -23,17 +24,17 @@
  *           from http://daxjohan.blogspot.com.au/2015/01/ax-2012-r2-fix-sqldictionary.html
  */
 
-USE DAXDEWIN6
+USE AX2012DB
 GO
 
 -- Backup the existing SQL dictionary as precaution
 SELECT *
-INTO DAXDEWIN6.dbo.SQLDICTIONARY_BAK
-FROM DAXDEWIN6.dbo.SQLDICTIONARY
+INTO AX2012DB.dbo.SQLDICTIONARY_BAK
+FROM AX2012DB.dbo.SQLDICTIONARY
 
 SELECT *
-INTO DAXDEWIN6.dbo.SYSTEMSEQUENCES_BAK
-FROM DAXDEWIN6.dbo.SYSTEMSEQUENCES
+INTO AX2012DB.dbo.SYSTEMSEQUENCES_BAK
+FROM AX2012DB.dbo.SYSTEMSEQUENCES
 
 ----------------------------------------------------------------------------------------------
 -- Step 1: Check and fix any duplicates in SqlDictionary.
@@ -41,10 +42,10 @@ FROM DAXDEWIN6.dbo.SYSTEMSEQUENCES
 PRINT 'Step 1';
 
 SELECT
-	*,
-	ROW_NUMBER() OVER(PARTITION BY Name, SQLName ORDER BY RecID) as RN
+    *,
+    ROW_NUMBER() OVER(PARTITION BY Name, SQLName ORDER BY RecID) as RN
 INTO #RecordsWithDuplicateTableIds
-FROM DAXDEWIN6.dbo.SQLDICTIONARY
+FROM AX2012DB.dbo.SQLDICTIONARY
 WHERE SQLDICTIONARY.FIELDID = 0
 
 -- Remove the non-duplicates from our list
@@ -52,14 +53,14 @@ DELETE #RecordsWithDuplicateTableIds
 WHERE RN = 1
 
 -- Delete the duplicate records for the tables, and the field records for those duplicated tables
-DELETE DAXDEWIN6.dbo.SQLDICTIONARY
+DELETE AX2012DB.dbo.SQLDICTIONARY
 WHERE TableId IN (SELECT TableId FROM #RecordsWithDuplicateTableIds)
 
 DROP TABLE #RecordsWithDuplicateTableIds
 
 
 
-USE DAXDEWIN6_Model
+USE AX2012DB_Model
 GO
 
 ----------------------------------------------------------------------------------------------
@@ -71,28 +72,28 @@ GO
 PRINT 'Step 2';
 
 WITH t AS (
-	SELECT
-		m.ElementHandle,
-		m.NAME AS mName,
-		m.AxId,
-		md.LegacyId,
-		s.TABLEID,
-		s.NAME AS sName,
-		s.SQLNAME
-	FROM ModelElementData md, ModelElement m
-	LEFT OUTER JOIN DAXDEWIN6..SQLDictionary s
-		ON upper(m.NAME) collate Latin1_General_CI_AS = s.NAME
-	WHERE m.ElementType = 44 -- UtilElementType::Table
-		AND m.elementhandle = md.elementhandle
-		AND s.ARRAY = 0
-		AND s.FIELDID = 0
-		AND s.TABLEID != m.AxId
+    SELECT
+        m.ElementHandle,
+        m.NAME AS mName,
+        m.AxId,
+        md.LegacyId,
+        s.TABLEID,
+        s.NAME AS sName,
+        s.SQLNAME
+    FROM ModelElementData md, ModelElement m
+    LEFT OUTER JOIN AX2012DB..SQLDictionary s
+        ON upper(m.NAME) collate Latin1_General_CI_AS = s.NAME
+    WHERE m.ElementType = 44 -- UtilElementType::Table
+        AND m.elementhandle = md.elementhandle
+        AND s.ARRAY = 0
+        AND s.FIELDID = 0
+        AND s.TABLEID != m.AxId
 )
-UPDATE DAXDEWIN6.dbo.SYSTEMSEQUENCES
+UPDATE AX2012DB.dbo.SYSTEMSEQUENCES
 SET TABID = t.axid
 FROM t
-JOIN DAXDEWIN6.dbo.SYSTEMSEQUENCES x
-	ON t.tableid = x.tabid
+JOIN AX2012DB.dbo.SYSTEMSEQUENCES x
+    ON t.tableid = x.tabid
 GO
 
 ----------------------------------------------------------------------------------------------
@@ -102,53 +103,53 @@ GO
 PRINT 'Step 3';
 
 WITH t AS (
-	SELECT
-		m.ElementHandle,
-		m.NAME AS mName,
-		m.AxId,
-		md.LegacyId,
-		s.TABLEID,
-		s.NAME AS sName,
-		s.SQLNAME
-	FROM modelelementdata md,ModelElement m
-	LEFT OUTER JOIN DAXDEWIN6..SQLDictionary s
-	ON upper(m.NAME) collate Latin1_General_CI_AS = s.NAME
-	WHERE m.ElementType = 44 -- UtilElementType::Table
-		AND m.elementhandle = md.elementhandle
-		AND s.ARRAY = 0
-		AND s.FIELDID = 0
-		AND s.TABLEID != m.AxId
+    SELECT
+        m.ElementHandle,
+        m.NAME AS mName,
+        m.AxId,
+        md.LegacyId,
+        s.TABLEID,
+        s.NAME AS sName,
+        s.SQLNAME
+    FROM modelelementdata md,ModelElement m
+    LEFT OUTER JOIN AX2012DB..SQLDictionary s
+    ON upper(m.NAME) collate Latin1_General_CI_AS = s.NAME
+    WHERE m.ElementType = 44 -- UtilElementType::Table
+        AND m.elementhandle = md.elementhandle
+        AND s.ARRAY = 0
+        AND s.FIELDID = 0
+        AND s.TABLEID != m.AxId
 )
-UPDATE DAXDEWIN6.dbo.SQLDICTIONARY
+UPDATE AX2012DB.dbo.SQLDICTIONARY
 SET TABLEID = (t.axid * -1)  -- Update to the correct number, but as a negative, just in case the destimation number is currently being used
 FROM t
-JOIN DAXDEWIN6.dbo.SQLDICTIONARY s
+JOIN AX2012DB.dbo.SQLDICTIONARY s
 ON t.tableid = s.tableid
 GO
 
 
 --verify SQLDICTIONARY that have negative IDs for change to positive
 WITH t AS  (
-	SELECT
-		m.ElementHandle,
-		m.NAME AS mName,
-		m.AxId,
-		md.LegacyId,
-		s.TABLEID,
-		s.NAME AS sName,
-		s.SQLNAME
-	FROM modelelementdata md, ModelElement m
-	LEFT OUTER JOIN DAXDEWIN6..SQLDictionary s
-	ON (s.TABLEID * -1) = m.AxId
-	WHERE m.ElementType = 44 -- UtilElementType::Table
-		AND m.elementhandle = md.elementhandle
-		AND s.ARRAY = 0
-		AND s.FIELDID = 0
-		AND upper(m.NAME) collate Latin1_General_CI_AS = s.NAME
+    SELECT
+        m.ElementHandle,
+        m.NAME AS mName,
+        m.AxId,
+        md.LegacyId,
+        s.TABLEID,
+        s.NAME AS sName,
+        s.SQLNAME
+    FROM modelelementdata md, ModelElement m
+    LEFT OUTER JOIN AX2012DB..SQLDictionary s
+    ON (s.TABLEID * -1) = m.AxId
+    WHERE m.ElementType = 44 -- UtilElementType::Table
+        AND m.elementhandle = md.elementhandle
+        AND s.ARRAY = 0
+        AND s.FIELDID = 0
+        AND upper(m.NAME) collate Latin1_General_CI_AS = s.NAME
 )
-UPDATE DAXDEWIN6.dbo.SQLDICTIONARY
+UPDATE AX2012DB.dbo.SQLDICTIONARY
 SET TABLEID = (TABLEID * -1) -- Update to positive
-WHERE DAXDEWIN6.dbo.SQLDICTIONARY.TABLEID < 0
+WHERE AX2012DB.dbo.SQLDICTIONARY.TABLEID < 0
 GO
 
 
@@ -158,38 +159,38 @@ GO
 PRINT 'Step 4';
 
 WITH t AS (
-	SELECT (
-			SELECT m1.NAME
-			FROM ModelElement m1
-			WHERE m1.ElementHandle = m.ParentHandle
-		) AS [Table Name],
-		m.NAME AS [mName],
-		m.AXid,
-		s.RECID,
-		M.ParentId,
-		s.TableId,
-		s.FIELDID,
-		S.NAME,
-		s.SQLNAME
-	FROM ModelElement m
-	LEFT OUTER JOIN DAXDEWIN6..SQLDICTIONARY s
-		ON m.ParentId = s.TABLEID
-		AND s.NAME =  upper(m.NAME) collate Latin1_General_CI_AS
-	WHERE m.ElementType = 42 -- UtilElementType::TableField
-		AND (s.ARRAY = 1 OR s.ARRAY IS NULL)
-		AND (s.FIELDID > 0 OR s.FIELDID IS NULL)
-		AND s.FIELDID != m.AxId
+    SELECT (
+            SELECT m1.NAME
+            FROM ModelElement m1
+            WHERE m1.ElementHandle = m.ParentHandle
+        ) AS [Table Name],
+        m.NAME AS [mName],
+        m.AXid,
+        s.RECID,
+        M.ParentId,
+        s.TableId,
+        s.FIELDID,
+        S.NAME,
+        s.SQLNAME
+    FROM ModelElement m
+    LEFT OUTER JOIN AX2012DB..SQLDICTIONARY s
+        ON m.ParentId = s.TABLEID
+        AND s.NAME =  upper(m.NAME) collate Latin1_General_CI_AS
+    WHERE m.ElementType = 42 -- UtilElementType::TableField
+        AND (s.ARRAY = 1 OR s.ARRAY IS NULL)
+        AND (s.FIELDID > 0 OR s.FIELDID IS NULL)
+        AND s.FIELDID != m.AxId
 )
-UPDATE DAXDEWIN6.dbo.SQLDICTIONARY
+UPDATE AX2012DB.dbo.SQLDICTIONARY
 SET FIELDID = (t.axid * -1) -- Set to a negative number but correct ID
-FROM t join DAXDEWIN6.dbo.SQLDICTIONARY s
+FROM t join AX2012DB.dbo.SQLDICTIONARY s
 ON upper(t.mName) collate Latin1_General_CI_AS = s.NAME
-	AND s.FIELDID <> 0
-	AND s.TABLEID = t.ParentId
+    AND s.FIELDID <> 0
+    AND s.TABLEID = t.ParentId
 GO
 
 -- Reverse the negative to positive
-UPDATE DAXDEWIN6.dbo.SQLDICTIONARY
+UPDATE AX2012DB.dbo.SQLDICTIONARY
 SET FIELDID = (FIELDID * -1)
 WHERE FIELDID < 0
 GO
@@ -202,37 +203,37 @@ GO
 PRINT 'Step 5';
 
 WITH t AS (
-	SELECT (
-			SELECT m1.NAME
-			FROM ModelElement m1
-			WHERE m1.ElementHandle = m.ParentHandle
-		) AS [Table Name],
-		m.NAME AS [mName],
-		m.AXid,
-		s.RECID,
-		M.ParentId,
-		s.TableId,
-		s.FIELDID,
-		S.NAME,
-		s.SQLNAME,
-		(
-			SELECT MAX(FieldId)
-			FROM DAXDEWIN6..SQLDICTIONARY
-			WHERE SQLDICTIONARY.TableId = s.TableId
-		) + 1 as [Next FieldId Would Be]
-	FROM ModelElement m
-	LEFT OUTER JOIN DAXDEWIN6..SQLDICTIONARY s
-		ON m.ParentId = s.TABLEID
-		AND s.FIELDID = m.AxId
-	WHERE m.ElementType = 42 -- UtilElementType::TableField
-		AND (s.ARRAY = 1 OR s.ARRAY IS NULL)
-		AND (s.FIELDID > 0 OR s.FIELDID IS NULL)
-		AND s.NAME !=  upper(m.NAME) collate Latin1_General_CI_AS
+    SELECT (
+            SELECT m1.NAME
+            FROM ModelElement m1
+            WHERE m1.ElementHandle = m.ParentHandle
+        ) AS [Table Name],
+        m.NAME AS [mName],
+        m.AXid,
+        s.RECID,
+        M.ParentId,
+        s.TableId,
+        s.FIELDID,
+        S.NAME,
+        s.SQLNAME,
+        (
+            SELECT MAX(FieldId)
+            FROM AX2012DB..SQLDICTIONARY
+            WHERE SQLDICTIONARY.TableId = s.TableId
+        ) + 1 as [Next FieldId Would Be]
+    FROM ModelElement m
+    LEFT OUTER JOIN AX2012DB..SQLDICTIONARY s
+        ON m.ParentId = s.TABLEID
+        AND s.FIELDID = m.AxId
+    WHERE m.ElementType = 42 -- UtilElementType::TableField
+        AND (s.ARRAY = 1 OR s.ARRAY IS NULL)
+        AND (s.FIELDID > 0 OR s.FIELDID IS NULL)
+        AND s.NAME !=  upper(m.NAME) collate Latin1_General_CI_AS
 )
-UPDATE DAXDEWIN6.dbo.SQLDICTIONARY
+UPDATE AX2012DB.dbo.SQLDICTIONARY
 SET FieldID = [Next FieldId Would Be]
 FROM t
-JOIN DAXDEWIN6.dbo.SQLDICTIONARY s
+JOIN AX2012DB.dbo.SQLDICTIONARY s
 ON t.tableid = s.tableid
-	AND t.FieldID = s.FieldID
+    AND t.FieldID = s.FieldID
 GO
