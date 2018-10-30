@@ -1,6 +1,11 @@
 # AX-2012
 
-A repository for reusable code related to AX 2012 deployment and maintenance.
+A repository for reusable code related to AX 2012 administration and maintenance.
+
+## The Ultimate AX 2012 Table and Field ID Fix for Synchronization Errors
+
+This script fixes both Table and Field IDs in SqlDictionary (data db) to match the AX code (Model db).  Useful for after a database has been restored and the table or field IDs do not match. Instead of letting the database synchronization process drop and recreate the table, just run this SQL Script!
+
 
 ## Get-AxDllVersions Cmdlet
 
