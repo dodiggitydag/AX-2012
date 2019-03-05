@@ -1,0 +1,79 @@
+﻿Exportfile for AOT version 1.0 or later
+Formatversion: 1
+
+***Element: JOB
+
+; Microsoft Dynamics AX Job: mcaCheckTableCache unloaded
+; --------------------------------------------------------------------------------
+  JOBVERSION 1
+  
+  SOURCE #dagCheckTableCache
+    #static void mcaCheckTableCache(Args _args)
+    #{
+    #    Dictionary              dictionary = new Dictionary();
+    #    int                     i;
+    #    SysDictTable            sysDictTable;
+    #    real                    maxBytesForEntireTableCache;
+    #    real                    recordSize;
+    #    int                     maxRecordsEntireTableCache;
+    #    int                     currentRecordCount;
+    #    SysGlobalConfiguration  config;
+    #    TableId                 tableId;
+    #
+    #    select Value from config
+    #        where config.ServerId == ''
+    #           && config.Name == 'ENTIRETABLECACHELIMIT';
+    #
+    #    maxBytesForEntireTableCache = 1024 * str2int(config.Value); // 96 is the default, 512 is extreame
+    #    if (!maxBytesForEntireTableCache)
+    #        maxBytesForEntireTableCache = 1024 * 96;
+    #
+    #
+    #    for (i=1 ; i<=dictionary.tableCnt() ; i++)
+    #    {
+    #        tableId = dictionary.tableCnt2Id(i);
+    #        sysDictTable = new SysDictTable(tableId);
+    #
+    #        // The following tables have errors with record count, so skip them
+    #        switch (tableId)
+    #        {
+    #            case tableNum(AifSqlCdcEnabledTables):
+    #            case tableNum(AifSqlCtTriggers):
+    #            case tableNum(AifSqlCtVersion):
+    #                continue;
+    #        }
+    #
+    #        if (sysDictTable.tableType() == TableType::Regular)
+    #        {
+    #            currentRecordCount = sysDictTable.recordCount();
+    #            recordSize = sysDictTable.recordSize();
+    #            maxRecordsEntireTableCache = real2int(maxBytesForEntireTableCache / recordSize); // precision loss is wanted here - cut decimals
+    #
+    #            if (sysDictTable.cacheLookup() == RecordCacheLevel::EntireTable)
+    #            {
+    #                if (currentRecordCount > maxRecordsEntireTableCache)
+    #                {
+    #                    // Table Too Large For Entire Table Cache
+    #                    warning(strFmt('The size of %1 is too large for EntireTable caching and it is causing the table to be cached on disk instead of in RAM.  %2 records would fit in %3 KB of RAM but found %4 records.', sysDictTable.name(), maxRecordsEntireTableCache, config.Value, currentRecordCount));
+    #                }
+    #            }
+    #            else if (currentRecordCount) // if there are records
+    #            {
+    #                switch (sysDictTable.tableGroup())
+    #                {
+    #                    case TableGroup::Group:
+    #                    case TableGroup::Parameter:
+    #                        info(strFmt('Table %1 would fit within RAM if it were set to EntireTable caching.  Current setting is %2.  %3 records would fit in %4 KB of RAM and only found %5 records.', sysDictTable.name(), sysDictTable.cacheLookup(), maxRecordsEntireTableCache, config.Value, currentRecordCount));
+    #                        break;
+    #                }
+    #            }
+    #        }
+    #    }
+    #}
+  ENDSOURCE
+  PROPERTIES
+    Origin              #{D1E7844B-4FE1-4A36-9AE3E-85E0968E6EBF}
+  ENDPROPERTIES
+  
+
+***Element: END
