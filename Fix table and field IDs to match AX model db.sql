@@ -191,6 +191,7 @@ ON upper(t.mName) collate Latin1_General_CI_AS = s.NAME
 GO
 
 USE AX2012DB
+GO
 
 -- Reverse the negative to positive
 UPDATE SQLDICTIONARY
@@ -217,7 +218,7 @@ GO
 PRINT 'Step 5';
 
 USE AX2012DB_model
-
+GO
 
 WITH t AS (
 	SELECT *,
