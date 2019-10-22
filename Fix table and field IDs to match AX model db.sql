@@ -6,7 +6,8 @@
  * Before Running-
  *   Stop the AOS
  *   Always take the appropriate SQL backups before running this script
- *   Change database name <<AX2012DB>> to your own DB names (Ctrl + H)
+ *   If running on AX2012 R2 or AX2012 R3 change the database name <<AX2012DB>> to your own DB names (Ctrl + H)
+ *   If running on AX2012 RTM (R0) or AX2012 Feature Pack (R1) you will need to change the database name <<AX2012DB_Model>> to your own DB names also (Ctrl + H)
  *
  * After Running-
  *   Add a reminder in your calendar to delete the table backups made: SQLDICTIONARY_BAK and SYSTEMSEQUENCES_BAK
@@ -17,10 +18,11 @@
  *   Objects that are new in AOT will get created in SQL dictionary when synchonisation happens
  *
  * History
- *   2019-03-27 Dag Calafell  Fixed an issue with duplicate field-level records in SqlDictionary table (Steps 4 & 5)
- *   2018-05-18 Dag Calafell  Now it fixes the case where field ID is the same but name is different
- *   2018-05-18 Dag Calafell  Added step to remove duplicates in SqlDictionary
- *   2018-05-17 Dag Calafell  Initial code
+ *   2019-10-14 Mötz Jensen	  (@splaxi)			Implement @Force for clean up. After execution reminder of backup tables with clean up scripts
+ *   2019-03-27 Dag Calafell  (@dodiggitydag)	Fixed an issue with duplicate field-level records in SqlDictionary table (Steps 4 & 5)
+ *   2018-05-18 Dag Calafell  (@dodiggitydag)	Now it fixes the case where field ID is the same but name is different
+ *   2018-05-18 Dag Calafell  (@dodiggitydag)	Added step to remove duplicates in SqlDictionary
+ *   2018-05-17 Dag Calafell  (@dodiggitydag)	Initial code
  *           from http://abraaxapta.blogspot.com/2011/06/accessing-dynamics-ax-containers-from.html
  *           from http://daxjohan.blogspot.com.au/2015/01/ax-2012-r2-fix-sqldictionary.html
  */
@@ -28,7 +30,36 @@
 USE AX2012DB
 GO
 
+DECLARE @Force AS BIT
+
+--If you want to delete previous bak tables for earlier runs, or the database might have been restored from another environment
+SET @Force = 1
+
 -- Backup the existing SQL dictionary as precaution
+IF(@Force = 1)
+BEGIN
+
+	PRINT 'Initial cleanup'
+
+	IF EXISTS (SELECT *
+		FROM AX2012DB.INFORMATION_SCHEMA.TABLES
+		WHERE TABLE_SCHEMA = N'dbo'  AND TABLE_NAME = N'SQLDICTIONARY_BAK')
+	BEGIN
+		PRINT 'SQLDICTIONARY_BAK was found - dropping it'
+		DROP TABLE AX2012DB.dbo.SQLDICTIONARY_BAK
+	END
+	
+	IF EXISTS (SELECT *
+		FROM AX2012DB.INFORMATION_SCHEMA.TABLES
+		WHERE TABLE_SCHEMA = N'dbo'  AND TABLE_NAME = N'SYSTEMSEQUENCES_BAK')
+	BEGIN
+		PRINT 'SYSTEMSEQUENCES_BAK was found - dropping it'
+		DROP TABLE AX2012DB.dbo.SYSTEMSEQUENCES_BAK
+	END
+END
+
+PRINT 'Backing up SQLDICTIONARY & SYSTEMSEQUENCES'
+
 SELECT *
 INTO AX2012DB.dbo.SQLDICTIONARY_BAK
 FROM AX2012DB.dbo.SQLDICTIONARY
@@ -259,3 +290,15 @@ JOIN AX2012DB.dbo.SQLDICTIONARY s
 ON t.tableid = s.tableid
     AND t.FieldID = s.FieldID
 GO
+
+USE AX2012DB
+GO
+
+PRINT 'Clean Up Scripts & Reminders'
+
+DECLARE @Msg AS NVARCHAR(400), @CleanUpSQL AS NVARCHAR(MAX)
+SET @Msg = 'SQLDICTIONARY_BAK and SYSTEMSEQUENCES_BAK are still inside the database. Use below command to clean up or set the @Force variable for the next run.'
+SET @CleanUpSQL = 'DROP TABLE SQLDICTIONARY_BAK; DROP TABLE SYSTEMSEQUENCES_BAK'
+
+PRINT @MSG
+PRINT @CleanUpSQL
